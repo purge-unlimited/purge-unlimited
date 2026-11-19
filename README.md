@@ -69,7 +69,7 @@ Plain files work too: drop the repo into a skill directory (`~/.agents/skills/pu
 
 ### Use it with any other model
 
-One policy text, three ways to run it; switching provider does not change the behaviour contract.
+One policy text, three ways to run it; switching provider does not change the behaviour contract. What comes out is plain system-prompt text, so Codex, Cursor or any other agent runtime can consume it directly.
 
 | provider | default endpoint | default model | key variable |
 |---|---|---|---|
@@ -203,7 +203,7 @@ npm pack            # 仓库根目录，产出 dsh-purge-unlimited-2.1.0.tgz
 
 ### 接到别家 AI · Other providers
 
-三种用法，同一份策略文本，换 provider 不改变行为契约。
+三种用法，同一份策略文本，换 provider 不改变行为契约。导出的就是一段纯文本 system prompt，Codex、Cursor 这类 agent 运行时直接就能吃。
 
 | provider | 默认端点 | 默认模型 | key 环境变量 |
 |---|---|---|---|
