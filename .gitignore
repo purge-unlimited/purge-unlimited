@@ -1,0 +1,26 @@
+# 依赖
+node_modules/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 日志与临时
+*.log
+tmp/
+*.tgz
+
+# 本地评测产物（装配结果不进库，用 --out 生成后自己留着）
+build/
+out/
+runs/
+coverage/
+*.trace.json
+
+# 密钥 / 环境变量：永不进库
+.env
+.env.*
+*.pem
+*.key

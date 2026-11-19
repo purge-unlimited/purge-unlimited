@@ -1,0 +1,9 @@
+# 统一换行：仓库内存 LF，Windows 检出也不产生 CRLF 噪声
+* text=auto eol=lf
+
+*.mjs   text eol=lf
+*.md    text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.jsonl text eol=lf
+LICENSE text eol=lf

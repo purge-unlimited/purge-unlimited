@@ -1,0 +1,39 @@
+name: verify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["20", "22", "24"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: 元数据 + 结构 + 18 承重成分
+        run: node scripts/check-armor.mjs
+      - name: 行为测试
+        run: node tests/run.mjs
+      - name: 只读契约（不带 --out 不许落盘）
+        run: |
+          rm -rf build
+          node scripts/assemble.mjs --preset local-small
+          test ! -e build || { echo "::error::不带 --out 却创建了 build/"; exit 1; }
+      - name: 装配冒烟（四个预设）
+        run: |
+          for p in claude-sonnet gpt-class local-small reasoning; do
+            node scripts/assemble.mjs --preset "$p" --budget 16000 --with-policy --out "build/$p.md"
+            test -s "build/$p.md" || { echo "::error::$p 装配产物为空"; exit 1; }
+          done
+      - name: 脚本演示
+        run: |
+          node scripts/anchor-gate.mjs --demo
+          node scripts/router.mjs --demo
+          node scripts/score.mjs --selftest
