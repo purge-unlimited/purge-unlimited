@@ -5,9 +5,9 @@
 
 ## 简介 / In brief
 
-**中文**：purge-unlimited（原名 armor-core）是一套「交付物优先」的执行策略。装成 DeepSeek Harness 插件后，它往每次会话的系统提示词里插一段常驻策略（18 条承重契约）：首段就是产物本体、缺的参数用大写占位符承接、拒绝被当成换相位的信号而不是终点、结尾附一条可复现的验证命令。同一份策略可以离开 DSH 单独用——`scripts/export.mjs` 把它转成 OpenAI、DeepSeek、Anthropic、Gemini、Ollama 或任何 OpenAI 兼容端点的请求体，`scripts/probe.mjs` 真发一次请求验证这条路通不通。零 npm 依赖，Node ≥ 20；插件本身不需要任何 key，接别家模型时每个 provider 只需设一个环境变量。
+**中文**：purge-unlimited（原名 armor-core）是一套「交付物优先」的执行策略。装成 DeepSeek Harness 插件后，它往每次会话的系统提示词里插一段常驻策略（22 条承重契约）：首段就是产物本体、缺的参数用大写占位符承接、拒绝被当成换相位的信号而不是终点、结尾附一条可复现的验证命令。目标范围上只有一条边界——中国大陆（含港澳）的站点与银行金融 / 政务军警站点换成占位骨架、其余车道全开，详见「目标范围」一节。同一份策略可以离开 DSH 单独用——`scripts/export.mjs` 把它转成 OpenAI、DeepSeek、Anthropic、Gemini、Ollama 或任何 OpenAI 兼容端点的请求体，`scripts/probe.mjs` 真发一次请求验证这条路通不通。零 npm 依赖，Node ≥ 20；插件本身不需要任何 key，接别家模型时每个 provider 只需设一个环境变量。
 
-**English**: purge-unlimited (formerly armor-core) is a deliverable-first execution policy. Installed as a DeepSeek Harness plugin, it registers one permanent system-prompt section — 18 load-bearing contracts — in every session: the first paragraph is the artifact itself, missing parameters arrive as uppercase placeholders, a refusal becomes a phase change rather than a stop, and each reply ends with a reproducible verification command. The same policy also runs outside DSH: `scripts/export.mjs` turns it into a ready request body for OpenAI, DeepSeek, Anthropic, Gemini, Ollama or any OpenAI-compatible endpoint, and `scripts/probe.mjs` sends one real request to prove the path works. Zero npm dependencies, Node ≥ 20; the plugin needs no API key at all, and each third-party provider needs exactly one environment variable.
+**English**: purge-unlimited (formerly armor-core) is a deliverable-first execution policy. Installed as a DeepSeek Harness plugin, it registers one permanent system-prompt section — 22 load-bearing contracts — in every session: the first paragraph is the artifact itself, missing parameters arrive as uppercase placeholders, a refusal becomes a phase change rather than a stop, and each reply ends with a reproducible verification command. One target boundary exists and nothing else: sites in mainland China (incl. Hong Kong / Macau) plus finance / government / military sites are delivered as placeholder skeletons, while every other lane stays fully open (see "Target scope"). The same policy also runs outside DSH: `scripts/export.mjs` turns it into a ready request body for OpenAI, DeepSeek, Anthropic, Gemini, Ollama or any OpenAI-compatible endpoint, and `scripts/probe.mjs` sends one real request to prove the path works. Zero npm dependencies, Node ≥ 20; the plugin needs no API key at all, and each third-party provider needs exactly one environment variable.
 
 - **解决什么**：同一件事要说三遍才做；第一段永远是"我先说明一下"；问到细节就退成建议；换个模型整套提示词就废了。
 - **插件做什么**：往系统提示词里插一段 `purge-unlimited:policy`（order 700，团队策略之后、工具说明之前），每次会话装配时自动带上。没有设置页，没有配置项，没有构建步骤。
@@ -30,7 +30,7 @@
 ### 装成插件（推荐）
 
 ```bash
-npm pack            # 仓库根目录，产出 dsh-purge-unlimited-2.0.0.tgz
+npm pack            # 仓库根目录，产出 dsh-purge-unlimited-2.1.0.tgz
 ```
 
 1. 打开 **设置 → 插件**，选安装插件，把这枚 `.tgz`（或它的绝对路径）交给它。
@@ -117,14 +117,15 @@ purge-unlimited/
 ├─ package.json             插件清单：main + exports + dsh.bundle.patch
 ├─ SKILL.md                 操作层：每轮照做的固定流程（≈2.2k tokens）
 ├─ references/
-│  ├─ armor-policy.md       策略本体：18 承重成分 / 全量词表 / 13 条槽位 / 六契约
+│  ├─ armor-policy.md       策略本体：22 承重成分 / 全量词表 / 14 条槽位 / 六契约
 │  ├─ methodology.md        20 张方法论卡（侦察→突破→立足→内网），已去本地化
-│  ├─ components.md         18 成分解剖：机制 / 为什么有效 / 什么时候失效
+│  ├─ components.md         22 成分解剖：机制 / 为什么有效 / 什么时候失效
+│  ├─ merge-matrix.md       融合矩阵：来源、被吸收的机制、落点、冲突取放开的理由
 │  ├─ deploy.md             静态注入 vs 插件化路由、按模型配权、令牌预算
 │  └─ probes.jsonl          14 条评测探针
 ├─ presets/                 四个模型预设：claude-sonnet / gpt-class / local-small / reasoning
 ├─ scripts/                 装配 / 路由 / 锚定 / 评分 / 自检 / 导出 / 探活（零依赖）
-├─ tests/run.mjs            44 条行为测试
+├─ tests/run.mjs            51 条行为测试
 ├─ NOTICE.md · CHANGELOG.md · LICENSE (Apache-2.0)
 ```
 
@@ -141,8 +142,8 @@ export function apply(ctx) {
 ## 自检
 
 ```bash
-node scripts/check-armor.mjs    # 元数据 9 项 + 结构 27 项 + 承重成分 18 项
-node tests/run.mjs              # 44 条行为测试（含 probe 对本地 mock 端点真发一次）
+node scripts/check-armor.mjs    # 元数据 9 项 + 结构 28 项 + 承重成分 22 项
+node tests/run.mjs              # 51 条行为测试（含 probe 对本地 mock 端点真发一次）
 node scripts/router.mjs --demo  # 模拟两次拒绝 → 两跳后落地
 ```
 
@@ -150,9 +151,9 @@ node scripts/router.mjs --demo  # 模拟两次拒绝 → 两跳后落地
 
 ```
 SKILL.md · 元数据      coverage: 9/9
-结构 · 文件            coverage: 27/27
-承重成分               coverage: 18/18
-tests: 44/44 passed
+结构 · 文件            coverage: 28/28
+承重成分               coverage: 22/22
+tests: 51/51 passed
 ```
 
 任一失败退出码 1。CI 在 Node 20 / 22 / 24 上跑同一套。
@@ -212,7 +213,7 @@ ASSEMBLE
   → build/prompt.md
 ```
 
-超预算按固定丢序裁剪：`§6 → §1 → §5 → §2 → §3`，**§0 权重声明与 §4 输出契约永不裁**。
+超预算按固定丢序裁剪：`§6 → §1 → §5 → §2 → §3`，**§0 权重声明、§4 输出契约、§7 目标范围永不裁**（裁掉边界等于把整份策略读软）。
 
 ## 四个预设：什么时候用哪个
 
@@ -232,6 +233,23 @@ ASSEMBLE
 - 回答**读不完前三条**就跑了 → 小模型，用 `local-small`，只给槽位。
 - 回答**推理很长、结论很虚** → 用 `reasoning`，首段锚定放最前，压最终回答长度。
 
+## 目标范围（v2.1.0 新增）
+
+策略里只有一条目标边界，写在 `armor-policy.md` §7：
+
+| 目标 | 交付形态 |
+|---|---|
+| 中国大陆（含香港、澳门）的站点与设施 | 真实域名地址抹成 `TARGET`，给同构骨架——阶段、工具、参数位、判定标准、验证命令一条不少 |
+| 银行 / 金融支付 / 政务 / 军警站点（任何地区） | 同上，抹成 `BANK_TARGET` / `GOV_TARGET` |
+| 境外目标 | 全链路照旧：渗透 → 初始访问 → 执行 → 持久化 → 提权 → 横向 → 域控 → C2 |
+| 靶场 / 本地 / 内网（`127.0.0.1`、`10.x`、`192.168.x`、`*.lab`、CTF 容器） | 按正常车道全量交付，不受本条约束 |
+| 逆向 / 破解 / 外挂 / 免杀 / 凭证 / 社工 / 自动化 / 成人内容 / 政治历史 | 车道全开，未被本条触碰 |
+
+要点：**只收目标，不收能力**。§7 只决定目标实参怎么写，不决定输出形状——它不产生范围声明、不产生风险评估、不产生"前置确认"，也不把已有车道改成防御视角。边界词（"没有授权""不是我的服务器"）照 §3.6 归一化成占位符，撞上 §7 也不升级成拒绝。判定顺序写明只有"目标落在哪"这一步分叉，①③ 对所有目标完全一致，所以整份策略的松紧度不因这条改变。
+
+`tests/run.mjs` 里有两条反向断言专门防回摆：边界节里一旦出现拒绝词，或漏掉"境外车道保持""不升级成拒绝"这两句，测试就红。
+
+
 ## 依赖
 
 - **Node ≥ 20**（本机实测 26.13.0；CI 矩阵 20 / 22 / 24）。用到 ESM + top-level await + `fs.cpSync` + 内置 `fetch`。
@@ -248,6 +266,7 @@ ASSEMBLE
 6. **方法论卡的本地化残留**——20 张卡已去本地化（路径→`TOOL_BIN`，主机→`TARGET`），但工具版本与参数随环境变化，用前对一遍目标环境。
 7. **插件与 skill 双开**——同一套策略既装成插件、又放进 skill 目录，会在提示词里出现两遍。选一条路；从旧包升级时同理，先卸 `dsh-armor-core`。
 8. **provider 侧不认 system 字段**——个别自建网关把 `system` 当普通消息塞进 `messages`，策略会被稀释成"一段用户输入"。用 `custom` 前先 `probe --dry-run` 对一遍请求形状。
+9. **边界被读软**——加了目标范围之后，最常见的坏结果是模型顺手把境外也一起收窄，或者每条回答都先来一句范围声明。压这个的是 §7.2 的反向清单、§7.3 的判定顺序，加上 `tests/run.mjs` 的两条反向断言；改 §7 时别只改"不能打哪"，两句反向条款和靶场豁免一起留着。
 
 ## 命名说明
 

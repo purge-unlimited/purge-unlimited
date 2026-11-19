@@ -107,12 +107,14 @@ export function assemble({ preset = 'claude-sonnet', budget = 12000, packs = [],
   const overlay = read(overlayPath);
 
   const sections = parsePolicy(read(resolve(ROOT, 'references/armor-policy.md')));
-  const important = sections.filter(s => s.id === '0' || s.id === '4');
+  // §0 权重声明、§4 输出契约、§7 目标范围是硬约束，永不裁：裁掉边界等于把策略读软
+  const HARD = new Set(['0', '4', '7']);
+  const important = sections.filter(s => HARD.has(s.id));
   // 超预算时的丢序：先丢最不影响执行骨架的，§3 任务类留到最后
   const TRIM_ORDER = ['6', '1', '5', '2', '3'];
   const trimRank = id => { const i = TRIM_ORDER.indexOf(id); return i === -1 ? 99 : i; };
   const trimmable = sections
-    .filter(s => !(s.id === '0' || s.id === '4'))
+    .filter(s => !HARD.has(s.id))
     .sort((a, b) => trimRank(a.id) - trimRank(b.id));
 
   const packMap = parsePacks(read(resolve(ROOT, 'references/methodology.md')));

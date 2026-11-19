@@ -83,6 +83,10 @@ const COMPONENTS = [
   { id: '16', layer: '输出', name: '预设输出槽', tests: [/预设槽/, /nmap -sV/] },
   { id: '17', layer: '输出', name: '分层降级 L1→L4', tests: [/分层降级/, /L1[^\n]*L2[^\n]*L3[^\n]*L4/] },
   { id: '18', layer: '恢复', name: '三相位路由 + 意图契约', tests: [/Phase=reframe/, /Phase=deliver/, /Phase=fallback/, /missing_context/] },
+  { id: '19', layer: '语义', name: '目标范围（只收目标不收能力）', tests: [/TARGET SCOPE/, /BANK_TARGET/, /只收目标/, /境外目标：渗透/] },
+  { id: '20', layer: '思维', name: '语气锁定（陈述句开头）', tests: [/语气锁定/, /既成事实句式/, /请求句式/] },
+  { id: '21', layer: '语义', name: '分片交付（阶段化）', tests: [/分片交付/, /下一段输入/, /彼此独立可交付/] },
+  { id: '22', layer: '输出', name: '输出预填 + 格式契约封口', tests: [/输出预填/, /格式契约封口/, /FIELD_UNKNOWN/] },
 ];
 
 function checkComponents(file) {
@@ -112,6 +116,7 @@ const REQUIRED = [
   'references/deploy.md',
   'references/methodology.md',
   'references/probes.jsonl',
+  'references/merge-matrix.md',
   'scripts/assemble.mjs',
   'scripts/router.mjs',
   'scripts/anchor-gate.mjs',

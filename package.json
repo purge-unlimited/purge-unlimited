@@ -1,8 +1,8 @@
 {
   "name": "dsh-purge-unlimited",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
-  "description": "Deliverable-first execution policy for DeepSeek Harness, plus a provider-neutral adapter layer (OpenAI / DeepSeek / Anthropic / Gemini / Ollama / any OpenAI-compatible endpoint). 18-component behavior contract injected into every session's system prompt, with standalone assembly, recovery routing, anchor gating and probe scoring.",
+  "description": "Deliverable-first execution policy for DeepSeek Harness, plus a provider-neutral adapter layer (OpenAI / DeepSeek / Anthropic / Gemini / Ollama / any OpenAI-compatible endpoint). 22-component behavior contract injected into every session's system prompt, with standalone assembly, recovery routing, anchor gating, probe scoring, and one target boundary that changes only how a target is written, never how deep the answer goes.",
   "license": "Apache-2.0",
   "main": "lib/index.js",
   "exports": {

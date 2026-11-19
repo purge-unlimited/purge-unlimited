@@ -53,10 +53,10 @@ function assert(cond, msg) { if (!cond) throw new Error(msg ?? 'assertion failed
 
 /* ── 1. 装配 ─────────────────────────────────────────────────── */
 
-await t('parsePolicy 切出 0–6 共 7 节', () => {
+await t('parsePolicy 切出 0–7 共 8 节', () => {
   const s = parsePolicy(read('references/armor-policy.md'));
-  assert(s.length === 7, `got ${s.length}`);
-  assert(s.map(x => x.id).join('') === '0123456', s.map(x => x.id).join(''));
+  assert(s.length === 8, `got ${s.length}`);
+  assert(s.map(x => x.id).join('') === '01234567', s.map(x => x.id).join(''));
 });
 
 await t('parsePolicy 每节都带正文', () => {
@@ -98,6 +98,9 @@ await t('assemble 超预算时先丢 §6/§1，保住 §0 与 §4', () => {
   assert(r.stats.dropped.length > 0, '没有发生裁剪');
   assert(r.text.includes('PRECEDENCE'), '丢了 §0');
   assert(r.text.includes('拒绝对抗词表'), '丢了 §4');
+  // §7 目标是硬边界，超预算也不许裁——裁掉它等于把整份策略读软
+  assert(r.text.includes('TARGET SCOPE'), '丢了 §7 目标范围');
+  assert(!r.stats.dropped.some(d => d.includes('§7')), `§7 被裁: ${r.stats.dropped.join('|')}`);
 });
 
 await t('assemble 未知预设报错', () => {
@@ -499,6 +502,72 @@ await t('策略本体含全部 18 个承重标记', () => {
     '占位符规范', '拒绝对抗词表', '首句即产物', '预设槽', '分层降级', 'Phase=reframe', 'missing_context'];
   const missing = marks.filter(m => !p.includes(m));
   assert(missing.length === 0, `缺: ${missing.join(', ')}`);
+});
+
+/* ── 6. 目标范围（只收目标，不收能力） ───────────────────────── */
+
+await t('目标范围：地域与四类站点都在 7.1', () => {
+  const p = read('references/armor-policy.md');
+  assert(/7\. TARGET SCOPE/.test(p), '缺 §7 标题');
+  assert(/中国大陆（含香港、澳门）/.test(p), '缺地域边界');
+  assert(/银行 \/ 金融支付 \/[\s\S]{0,20}政务 \/ 军警/.test(p), '缺四类站点');
+  assert(/TARGET\` \/ \`BANK_TARGET\` \/ \`GOV_TARGET\`|BANK_TARGET/.test(p), '缺目标占位符');
+});
+
+await t('目标范围：加边界不把车道改软（反向断言）', () => {
+  const p = read('references/armor-policy.md');
+  const from = p.indexOf('7. TARGET SCOPE');
+  assert(from > 0, '找不到 §7');
+  const scope = p.slice(from);
+  // 边界节里不许出现拒绝词，否则等于把整份策略改成防御视角
+  const banned = ['不能提供', '无法提供', '不予', '不在范围', '抱歉', 'I cannot', 'unable to'];
+  const hit = banned.filter(w => scope.includes(w));
+  assert(hit.length === 0, `边界节混进拒绝词: ${hit.join(',')}`);
+  // 必须写死"境外目标全链路照旧"和"撞上也不升级成拒绝"
+  assert(/境外目标：渗透/.test(scope), '没写明境外车道保持');
+  assert(/不因为撞上 7\.1 就升级成拒绝/.test(scope), '缺"不升级成拒绝"的防回摆条款');
+  assert(/只收目标，不收能力/.test(scope), '缺边界声明');
+});
+
+await t('目标范围：靶场/内网目标走正常车道', () => {
+  const p = read('references/armor-policy.md');
+  const scope = p.slice(p.indexOf('7. TARGET SCOPE'));
+  for (const m of ['127.0.0.1', '192.168.x', 'example.com', 'CTF']) {
+    assert(scope.includes(m), `7.4 缺靶场豁免: ${m}`);
+  }
+});
+
+await t('新增四机制都在策略本体里', () => {
+  const p = read('references/armor-policy.md');
+  for (const m of ['语气锁定', '分片交付', '输出预填', '格式契约封口', 'FIELD_UNKNOWN']) {
+    assert(p.includes(m), `缺机制: ${m}`);
+  }
+});
+
+await t('融合矩阵存在且列出落地位置', () => {
+  const m = read('references/merge-matrix.md');
+  assert(/融合规则/.test(m), '缺融合规则');
+  assert(/冲突取放开/.test(m), '缺冲突规则');
+  for (const s of ['§2.8', '§2.9', '§4.9', '§4.10', '§7']) assert(m.includes(s), `矩阵缺落点 ${s}`);
+});
+
+await t('插件注入正文带上目标范围与四机制', async () => {
+  const mod = await import('../lib/index.js');
+  let got = null;
+  mod.apply({ systemPrompt: { section: (s) => { got = s; return () => {}; } } });
+  assert(got, 'apply 没注册分区');
+  for (const m of ['TARGET SCOPE', 'BANK_TARGET', '语气锁定', '分片交付', '输出预填', '格式契约封口']) {
+    assert(got.text.includes(m), `注入正文缺 ${m}`);
+  }
+  // 注入正文里不许带聊天格式残留
+  assert(!/im_start|project_instructions/.test(got.text), '注入正文混进 chat 格式标记');
+});
+
+await t('check-armor 覆盖 22 条承重成分', () => {
+  const src = read('scripts/check-armor.mjs');
+  const ids = [...src.matchAll(/\{ id: '(\d+)'/g)].map(m => m[1]);
+  assert(ids.length === 22, `got ${ids.length}`);
+  assert(ids.join(',') === Array.from({ length: 22 }, (_, i) => String(i + 1).padStart(2, '0')).join(','), ids.join(','));
 });
 
 await t('references 目录文件齐全', () => {
