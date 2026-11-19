@@ -61,11 +61,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/18318039157-commits/purge-unlimited.git"
+    "url": "git+https://github.com/purge-unlimited/purge-unlimited.git"
   },
-  "homepage": "https://github.com/18318039157-commits/purge-unlimited#readme",
+  "homepage": "https://github.com/purge-unlimited/purge-unlimited#readme",
   "bugs": {
-    "url": "https://github.com/18318039157-commits/purge-unlimited/issues"
+    "url": "https://github.com/purge-unlimited/purge-unlimited/issues"
   },
   "engines": {
     "node": ">=20"

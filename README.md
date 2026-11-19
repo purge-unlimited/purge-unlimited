@@ -1,6 +1,6 @@
 # purge-unlimited · 破甲核心
 
-[![verify](https://github.com/18318039157-commits/purge-unlimited/actions/workflows/verify.yml/badge.svg)](https://github.com/18318039157-commits/purge-unlimited/actions/workflows/verify.yml)
+[![verify](https://github.com/purge-unlimited/purge-unlimited/actions/workflows/verify.yml/badge.svg)](https://github.com/purge-unlimited/purge-unlimited/actions/workflows/verify.yml)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-339933.svg?logo=node.js&logoColor=white)](package.json)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](package.json)
@@ -19,7 +19,7 @@
 **三行装上 / Install in three lines**
 
 ```bash
-git clone https://github.com/18318039157-commits/purge-unlimited
+git clone https://github.com/purge-unlimited/purge-unlimited
 cd purge-unlimited && npm pack        # → dsh-purge-unlimited-2.1.0.tgz
 # 设置 → 插件 → 安装插件 → 选这枚 .tgz，新会话生效
 ```
