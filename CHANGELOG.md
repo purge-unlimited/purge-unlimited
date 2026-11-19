@@ -2,6 +2,26 @@
 
 版本号单点：`package.json` 的 `version` 是唯一来源，`SKILL.md` 的 `metadata.version` 必须与之一致——`node scripts/check-armor.mjs` 会查这一条。
 
+## v1.2.0 — 2026-11-19
+
+形态改变：从「clone 下来自己跑的仓库」变成「装上就生效的 dsh 插件」。文字层、脚本层、测试不动，外面套一层跟本机其他插件一致的壳。
+
+**插件**
+
+- `lib/index.js`：cordis 插件入口，只做一件事——把装配好的策略注册成系统提示词分区 `armor-core:policy`（order 700，团队策略 600 之后、工具说明 800 之前）。宿主没有 `systemPrompt` 服务时安静跳过，不会让进程起不来；装配失败退回 `SKILL.md` 本体。
+- `cordis.patch.yml`：一条 `insert` entry，没有配置项。停用走插件管理器，不改代码。
+- `package.json`：`name` 改为 `dsh-armor-core`，补 `main` / `exports` / `dsh.bundle.patch`；`files` 只带运行所需（`lib`、`SKILL.md`、`references`、`presets`、`scripts`、`tests`、补丁与文档），产物 `.tgz` 由 `npm pack` 生成、不进库。
+- 不加设置页、不加客户端脚本、不加构建链、不加 postinstall。
+
+**自检**
+
+- `check-armor` 新增插件形态校验：`lib/index.js`、`cordis.patch.yml` 进 REQUIRED，另查 `dsh.bundle.patch` 指向的文件真的存在、`main` 指向 `lib/index.js`。结构项 16 → 20。
+- `tests` 新增 3 条：插件入口注册的分区名/order/正文是否合格、没有 `systemPrompt` 时不抛、清单声明的补丁文件存在。用例 25 → 28。
+
+**版本**
+
+- `package.json` 与 `SKILL.md` 的 `metadata.version` 同为 1.2.0（自检会拦两边不一致）。
+
 ## v1.1.1 — 2026-11-19
 
 首个公开发布版。修掉发布前实测出来的六处缺口，并把仓库补成可对外 clone 的形态。

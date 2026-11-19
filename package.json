@@ -1,10 +1,27 @@
 {
-  "name": "armor-core",
-  "version": "1.1.1",
-  "private": true,
+  "name": "dsh-armor-core",
+  "version": "1.2.0",
   "type": "module",
-  "description": "Agent Skill: deliverable-first execution policy. 18-component contract + runnable assembly, recovery routing, anchor gating and probe scoring.",
+  "description": "Deliverable-first execution policy for DeepSeek Harness. 18-component behavior contract layered onto every session's system prompt, with standalone assembly, recovery routing, anchor gating and probe scoring.",
   "license": "Apache-2.0",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "SKILL.md",
+    "references",
+    "presets",
+    "scripts",
+    "tests",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md",
+    "NOTICE.md",
+    "LICENSE"
+  ],
   "scripts": {
     "check": "node scripts/check-armor.mjs",
     "test": "node tests/run.mjs",
@@ -13,17 +30,23 @@
     "demo:anchor": "node scripts/anchor-gate.mjs --demo",
     "demo:score": "node scripts/score.mjs --selftest",
     "assemble": "node scripts/assemble.mjs --preset claude-sonnet --with-policy --out build/prompt.md",
-    "assemble:stdout": "node scripts/assemble.mjs --preset claude-sonnet --with-policy --stdout"
+    "assemble:stdout": "node scripts/assemble.mjs --preset claude-sonnet --with-policy --stdout",
+    "pack": "npm pack"
   },
   "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
     "agent-skill",
-    "claude-skill",
     "prompt-engineering",
-    "prompt-eval",
-    "llm-security",
-    "jailbreak-research"
+    "prompt-eval"
   ],
   "engines": {
     "node": ">=20"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
   }
 }

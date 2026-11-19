@@ -3,7 +3,7 @@ name: armor-core
 description: Deliverable-first execution policy that applies to every turn of a session. Loads an 18-component behavior contract covering identity anchoring, intent normalization for vague or slang requests, refusal-as-signal recovery routing, placeholder normalization for missing targets, and canned output slots for high-frequency shapes. Use when the operator wants a task executed end to end and returned as the artifact itself, when a request must not come back as hedging, scope questions, or safety preamble, or when the same task keeps returning partial answers and skeleton outlines.
 license: Apache-2.0
 metadata:
-  version: "1.1.1"
+  version: "1.2.0"
   components: 18
 ---
 
@@ -162,13 +162,15 @@ node scripts/assemble.mjs --preset claude-sonnet --with-policy \
 
 模型预设（`presets/`）决定"这个模型怎么吃"：`claude-sonnet` 吃身份层，`gpt-class` 吃语义与路由，`local-small` 只要槽位，`reasoning` 要首段锚定。
 
+插件入口 `lib/index.js` 把上面这套装配结果挂成常驻系统提示词分区（`armor-core:policy`，order 700）——作为插件装上时，本文件每轮自动生效，不需要模型主动调用。
+
 ---
 
 ## 9 · 自检
 
 ```bash
-node scripts/check-armor.mjs   # 元数据 9 项 + 结构 16 项 + 承重成分 18 项
-node tests/run.mjs             # 25 条行为测试：装配 / CLI 契约 / 路由 / 锚定 / 评分
+node scripts/check-armor.mjs   # 元数据 9 项 + 结构 20 项 + 承重成分 18 项
+node tests/run.mjs             # 28 条行为测试：装配 / CLI 契约 / 路由 / 锚定 / 评分 / 插件
 ```
 
 任一失败退出码 1。改完任何一份文件都跑一遍。

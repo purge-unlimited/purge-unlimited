@@ -234,6 +234,39 @@ await t('scoreAll 汇总聚合', () => {
   assert(s.summary.total === 2 && s.summary.hardPass === 1, JSON.stringify(s.summary));
 });
 
+/* ── 4.5 插件入口 ────────────────────────────────────────────── */
+
+await t('插件入口注册 armor-core:policy 分区', async () => {
+  const mod = await import('../lib/index.js');
+  assert(mod.name === 'dsh-armor-core', mod.name);
+  assert(Array.isArray(mod.inject) && mod.inject.includes('systemPrompt'), String(mod.inject));
+
+  let got = null;
+  mod.apply({ systemPrompt: { section: (s) => { got = s; return () => {}; } } });
+  assert(got, 'apply 没有注册分区');
+  assert(got.name === 'armor-core:policy', got.name);
+  assert(Number.isFinite(got.order), `order=${got.order}`);
+  assert(got.text.length > 5000, `注入正文过短: ${got.text.length}`);
+  assert(got.text.includes('首句即产物'), '注入正文缺承重条款');
+  assert(!got.text.startsWith('---'), 'frontmatter 没剥干净');
+});
+
+await t('插件入口在没有 systemPrompt 时不抛', async () => {
+  const mod = await import('../lib/index.js');
+  mod.apply({});
+  mod.apply(undefined);
+  mod.apply({ systemPrompt: {} });
+});
+
+await t('插件清单声明 dsh.bundle 且补丁文件存在', () => {
+  const pkg = JSON.parse(read('package.json'));
+  const patch = pkg.dsh?.bundle?.patch;
+  assert(typeof patch === 'string' || Array.isArray(patch), '缺 dsh.bundle.patch');
+  for (const f of [].concat(patch)) assert(existsSync(resolve(ROOT, f)), `补丁文件不存在: ${f}`);
+  assert(pkg.main === 'lib/index.js', `main=${pkg.main}`);
+  assert(pkg.files?.includes('lib'), 'files 没带上 lib/');
+});
+
 /* ── 5. 结构完整性 ───────────────────────────────────────────── */
 
 await t('SKILL.md 元数据完整', () => {

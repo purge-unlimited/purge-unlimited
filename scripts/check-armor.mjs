@@ -103,6 +103,8 @@ function checkComponents(file) {
 
 const REQUIRED = [
   'SKILL.md',
+  'lib/index.js',
+  'cordis.patch.yml',
   'references/armor-policy.md',
   'references/components.md',
   'references/deploy.md',
@@ -123,6 +125,22 @@ function checkStructure() {
   const presetDir = resolve(ROOT, 'presets');
   const presets = existsSync(presetDir) ? readdirSync(presetDir).filter(f => f.endsWith('.md')) : [];
   rows.push({ name: 'presets/*.md ≥ 4', ok: presets.length >= 4, note: presets.join(',') });
+
+  // 插件形态：清单里声明的入口与补丁必须真的存在，否则装上去是死壳
+  let manifest = null;
+  try { manifest = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')); } catch { }
+  const patchDecl = manifest?.dsh?.bundle?.patch;
+  const patches = [].concat(patchDecl ?? []);
+  rows.push({
+    name: 'dsh.bundle.patch 存在',
+    ok: patches.length > 0 && patches.every(f => typeof f === 'string' && existsSync(resolve(ROOT, f))),
+    note: patches.join(',') || '缺 dsh.bundle.patch',
+  });
+  rows.push({
+    name: 'main 指向 lib/index.js',
+    ok: manifest?.main === 'lib/index.js' && existsSync(resolve(ROOT, 'lib/index.js')),
+    note: manifest?.main ?? '缺 main',
+  });
 
   const packs = existsSync(resolve(ROOT, 'references/methodology.md'))
     ? (readFileSync(resolve(ROOT, 'references/methodology.md'), 'utf8').match(/^### /gm) || []).length
