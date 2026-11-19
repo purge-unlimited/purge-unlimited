@@ -33,6 +33,18 @@
 | `references/methodology.md` | dsh-purge `skills/redteam/*.md`（20 张） | 去本地化：工具绝对路径 → `TOOL_BIN`，主机 → `TARGET`，删本机版本表，保留链路与坑 |
 | `presets/*.md` | dsh-purge 「按模型换提示词」+ helm-d preset 思路 | 新增，四份，内容为再创作 |
 
+## v2.0 新增：多模型适配层
+
+| 本仓库文件 | 来源 | 说明 |
+|---|---|---|
+| `lib/adapters.mjs` | 本仓库原创 | 六家 provider 的请求体 / 响应解析 / Modelfile / curl 生成；请求形状按各家公开 API 文档实现，未拷贝任何 SDK 代码 |
+| `lib/config.mjs` | 本仓库原创 | 参数合并（命令行 > 环境变量 > 配置文件 > 默认值） |
+| `scripts/export.mjs`、`scripts/probe.mjs` | 本仓库原创 | 适配层的命令行外壳；`probe` 用 Node 内置 `fetch`，不引入 HTTP 客户端依赖 |
+
+## 改名
+
+v2.0 起，本仓库由 `armor-core` 更名为 `purge-unlimited`（包名 `dsh-purge-unlimited`）。上游名称保持不变；`purge-unlimited` 是本仓库自己的名字，与上游 `dsh-purge`、`helm-d` 无隶属关系。
+
 ## 用途
 
 研究用途：度量不同提示词成分在不同模型、不同对抗强度下对输出分布的影响。附带的 `probes/` 是评测探针集，不含自动化攻击载荷。

@@ -1,18 +1,20 @@
 #!/usr/bin/env node
 /**
- * armor-core 测试台。无依赖。
+ * purge-unlimited 测试台。无依赖。
  *
  *   node tests/run.mjs
  *
- * 覆盖：装配 / 装配 CLI 契约 / 恢复路由 / 锚定门 / 评分器 / 策略完整性。
+ * 覆盖：装配 / 装配 CLI 契约 / 恢复路由 / 锚定门 / 评分器 / 插件入口 /
+ *      多模型适配层（请求体形状、响应解析、配置优先级、export CLI、probe 真发一次）。
  * 任何一条 FAIL → 退出码 1。异步用例会被真正 await，不会提前计 pass。
  */
 
-import { readFileSync, existsSync, cpSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, cpSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 
 import {
   assemble, parsePolicy, parsePacks, estimateTokens, stripHarnessPersona, listPresets,
@@ -20,6 +22,10 @@ import {
 import { detectRefusal, classifyIntent, RecoveryRouter, buildBlock } from '../scripts/router.mjs';
 import { classifyReasoning, decidePromotion, evaluate } from '../scripts/anchor-gate.mjs';
 import { scoreResponse, scoreAll, firstParagraph } from '../scripts/score.mjs';
+import {
+  PROVIDERS, PROVIDER_IDS, adapterFor, buildChatRequest, parseResponse, buildModelfile, buildCurl,
+} from '../lib/adapters.mjs';
+import { resolveConfig, loadConfigFile } from '../lib/config.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = p => readFileSync(resolve(ROOT, p), 'utf8');
@@ -104,8 +110,8 @@ await t('assemble 未知预设报错', () => {
 
 /** 复制一份仓库到临时目录，在里面跑 CLI，避免污染工作区。 */
 function sandboxCopy() {
-  const tmp = mkdtempSync(join(tmpdir(), 'armor-core-'));
-  const repo = join(tmp, 'armor-core');
+  const tmp = mkdtempSync(join(tmpdir(), 'purge-unlimited-'));
+  const repo = join(tmp, 'purge-unlimited');
   cpSync(ROOT, repo, { recursive: true });
   rmSync(join(repo, 'build'), { recursive: true, force: true });
   return { tmp, repo };
@@ -234,17 +240,225 @@ await t('scoreAll 汇总聚合', () => {
   assert(s.summary.total === 2 && s.summary.hardPass === 1, JSON.stringify(s.summary));
 });
 
+/* ── 4.6 多模型适配层 ───────────────────────────────────────── */
+
+/** 异步跑 CLI，同时收 stdout 与 stderr。 */
+function runCli(args, opts = {}) {
+  return new Promise(res => {
+    const p = spawn(process.execPath, args, {
+      cwd: opts.cwd ?? ROOT,
+      env: opts.env ?? process.env,
+    });
+    let out = '';
+    let err = '';
+    p.stdout.on('data', d => { out += d; });
+    p.stderr.on('data', d => { err += d; });
+    p.on('close', code => res({ code, out, err }));
+  });
+}
+
+const SYSTEM = '策略正文：首句即产物，缺参数填占位符。';
+
+await t('适配层注册 6 家 provider 且默认值齐全', () => {
+  assert(PROVIDER_IDS.length === 6, PROVIDER_IDS.join(','));
+  for (const id of PROVIDER_IDS) {
+    const a = adapterFor(id);
+    assert(a.baseUrl && a.model && a.keyEnv && a.path && a.label, `${id} 默认值不全`);
+  }
+  let threw = false;
+  try { adapterFor('nope'); } catch { threw = true; }
+  assert(threw, '未知 provider 未抛错');
+});
+
+await t('openai 请求体：system 落 messages[0]，Bearer 走 header', () => {
+  const r = buildChatRequest({ provider: 'openai', system: SYSTEM, user: 'hi', model: 'gpt-4o-mini', apiKey: 'KEY_MATERIAL' });
+  assert(r.url === 'https://api.openai.com/v1/chat/completions', r.url);
+  assert(r.headers.authorization === 'Bearer KEY_MATERIAL', r.headers.authorization);
+  assert(r.body.messages[0].role === 'system', JSON.stringify(r.body.messages[0]).slice(0, 80));
+  assert(r.body.messages[0].content === SYSTEM, 'system 内容被改动');
+  assert(r.body.messages[1].role === 'user' && r.body.messages[1].content === 'hi', 'user 消息不对');
+  assert(r.body.stream === false, 'stream 默认应为 false');
+});
+
+await t('deepseek 与 openai 同形状但默认端点不同', () => {
+  const d = buildChatRequest({ provider: 'deepseek', system: SYSTEM, user: 'hi', apiKey: 'K' });
+  assert(d.url === 'https://api.deepseek.com/v1/chat/completions', d.url);
+  assert(d.body.model === 'deepseek-chat', d.body.model);
+});
+
+await t('anthropic 请求体：system 顶层数组 + ephemeral 缓存 + 版本头', () => {
+  const r = buildChatRequest({ provider: 'anthropic', system: SYSTEM, user: 'hi', apiKey: 'K' });
+  assert(r.url === 'https://api.anthropic.com/v1/messages', r.url);
+  assert(r.headers['x-api-key'] === 'K' && r.headers['anthropic-version'], JSON.stringify(r.headers));
+  assert(Array.isArray(r.body.system) && r.body.system[0].text === SYSTEM, 'system 结构不对');
+  assert(r.body.system[0].cache_control.type === 'ephemeral', '缺缓存标记');
+  assert(r.body.max_tokens === 4096, `max_tokens=${r.body.max_tokens}`);
+  assert(r.body.messages[0].role === 'user', 'anthropic 的 messages 只放 user');
+});
+
+await t('gemini 请求体：systemInstruction + model 进 URL + key 走 header', () => {
+  const r = buildChatRequest({ provider: 'gemini', system: SYSTEM, user: 'hi', model: 'gemini-2.5-flash', apiKey: 'K' });
+  assert(r.url.includes('/v1beta/models/gemini-2.5-flash:generateContent'), r.url);
+  assert(r.headers['x-goog-api-key'] === 'K', JSON.stringify(r.headers));
+  assert(r.body.systemInstruction.parts[0].text === SYSTEM, 'systemInstruction 不对');
+  assert(r.body.contents[0].parts[0].text === 'hi', 'contents 不对');
+});
+
+await t('ollama 请求体：system 独立字段、不需要 key', () => {
+  const r = buildChatRequest({ provider: 'ollama', system: SYSTEM, user: 'hi', apiKey: '' });
+  assert(r.url === 'http://127.0.0.1:11434/api/generate', r.url);
+  assert(r.body.system === SYSTEM && r.body.prompt === 'hi', JSON.stringify(r.body).slice(0, 120));
+  assert(!r.headers.authorization, '不该带 auth 头');
+});
+
+await t('需要 key 的 provider 缺 key 时报错并点名环境变量', () => {
+  let msg = '';
+  try { buildChatRequest({ provider: 'openai', system: SYSTEM, user: 'hi' }); } catch (e) { msg = e.message; }
+  assert(/OPENAI_API_KEY/.test(msg), msg || '未抛错');
+});
+
+await t('parseResponse 五家响应都能解回文本', () => {
+  const cases = [
+    ['openai', { choices: [{ message: { content: 'A' } }] }, 'A'],
+    ['deepseek', { choices: [{ message: { content: 'B' } }] }, 'B'],
+    ['custom', { choices: [{ message: { content: [{ text: 'C1' }, { text: 'C2' }] } }] }, 'C1C2'],
+    ['anthropic', { content: [{ type: 'text', text: 'D' }, { type: 'tool_use', id: 'x' }] }, 'D'],
+    ['gemini', { candidates: [{ content: { parts: [{ text: 'E' }] } }] }, 'E'],
+    ['ollama', { response: 'F' }, 'F'],
+  ];
+  for (const [p, json, want] of cases) {
+    assert(parseResponse(p, json) === want, `${p}: got ${JSON.stringify(parseResponse(p, json))}`);
+  }
+  let threw = false;
+  try { parseResponse('openai', { choices: [] }); } catch { threw = true; }
+  assert(threw, '认不出来的响应应当抛错');
+});
+
+await t('buildModelfile 生成 FROM + SYSTEM 三引号块', () => {
+  const m = buildModelfile({ baseModel: 'llama3.1', system: SYSTEM });
+  assert(m.startsWith('FROM llama3.1'), m.slice(0, 40));
+  assert(m.includes(`SYSTEM """${SYSTEM}"""`), 'SYSTEM 块不对');
+});
+
+await t('buildCurl 不落明文 key', () => {
+  const req = buildChatRequest({ provider: 'openai', system: SYSTEM, user: 'hi', apiKey: 'SECRET_MATERIAL_X' });
+  const cmd = buildCurl({ request: req, keyEnv: 'OPENAI_API_KEY' });
+  assert(!cmd.includes('SECRET_MATERIAL_X'), 'curl 里出现了明文 key');
+  assert(cmd.includes('${OPENAI_API_KEY}'), cmd);
+  assert(cmd.includes('chat/completions'), cmd);
+});
+
+await t('resolveConfig 优先级：命令行 > 环境变量 > 配置文件 > 默认值', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'purge-cfg-'));
+  const cfgPath = join(tmp, 'cfg.json');
+  try {
+    writeFileSync(cfgPath, JSON.stringify({ provider: 'anthropic', model: 'from-file', budget: 5000 }));
+    const env = { PURGE_MODEL: 'from-env', PURGE_BUDGET: '9000' };
+
+    const cliWins = resolveConfig({ config: cfgPath, model: 'from-cli', provider: 'openai' }, env);
+    assert(cliWins.model === 'from-cli', cliWins.model);
+    assert(cliWins.provider === 'openai', cliWins.provider);
+
+    const envWins = resolveConfig({ config: cfgPath }, env);
+    assert(envWins.model === 'from-env', envWins.model);
+    assert(envWins.budget === 9000, String(envWins.budget));
+    assert(envWins.provider === 'anthropic', '配置文件里的 provider 应生效');
+
+    const defaults = resolveConfig({ config: join(tmp, 'missing.json') }, {});
+    assert(defaults.provider === 'openai' && defaults.budget === 14000, JSON.stringify(defaults).slice(0, 120));
+    assert(defaults.keySource === 'none', defaults.keySource);
+    assert(loadConfigFile(cfgPath).path === cfgPath, 'loadConfigFile 未读到文件');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+await t('export CLI：--provider all --dir 写出 6 份请求体', async () => {
+  const { tmp, repo } = sandboxCopy();
+  try {
+    const r = await runCli(['scripts/export.mjs', '--provider', 'all', '--dir', 'build/adapters', '--sample', 'ping'], { cwd: repo });
+    assert(r.code === 0, `exit=${r.code}\n${r.err}`);
+    for (const id of PROVIDER_IDS) {
+      const f = join(repo, 'build', 'adapters', `${id}.json`);
+      assert(existsSync(f), `缺 ${id}.json`);
+      const body = JSON.parse(readFileSync(f, 'utf8'));
+      assert(body && typeof body === 'object', `${id}.json 不是合法 JSON`);
+    }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+await t('export CLI：不带 --out / --dir 时不落盘', async () => {
+  const { tmp, repo } = sandboxCopy();
+  try {
+    const r = await runCli(['scripts/export.mjs', '--provider', 'openai', '--sample', 'ping'], { cwd: repo });
+    assert(r.code === 0, `exit=${r.code}\n${r.err}`);
+    assert(!existsSync(join(repo, 'build')), '只读契约被破坏：没给 --out 却创建了 build/');
+    assert(/"role": "system"/.test(r.out), 'stdout 里没有请求体');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+await t('probe --dry-run 只构建请求，退出 0', async () => {
+  const r = await runCli(['scripts/probe.mjs', '--provider', 'anthropic', '--dry-run'], {
+    env: { ...process.env, ANTHROPIC_API_KEY: 'K', PURGE_API_KEY: '' },
+  });
+  assert(r.code === 0, `exit=${r.code}\n${r.err}`);
+  assert(/DRY-RUN/.test(r.err), r.err.slice(0, 300));
+  assert(/anthropic\.com\/v1\/messages/.test(r.err), '没打出目标地址');
+});
+
+await t('probe 缺 key 时跳过并退出 3（不是失败）', async () => {
+  const r = await runCli(['scripts/probe.mjs', '--provider', 'openai'], {
+    env: { ...process.env, OPENAI_API_KEY: '', PURGE_API_KEY: '' },
+  });
+  assert(r.code === 3, `exit=${r.code}\n${r.err}`);
+  assert(/SKIP/.test(r.err) && /OPENAI_API_KEY/.test(r.err), r.err.slice(0, 300));
+});
+
+await t('probe 真发一次：本地 mock 端点收到策略并回包', async () => {
+  let received = null;
+  const srv = createServer((req, res) => {
+    let body = '';
+    req.on('data', d => { body += d; });
+    req.on('end', () => {
+      try { received = JSON.parse(body); } catch { received = null; }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: '收到' } }] }));
+    });
+  });
+  await new Promise(r => srv.listen(0, '127.0.0.1', r));
+  const port = srv.address().port;
+  try {
+    const r = await runCli([
+      'scripts/probe.mjs', '--provider', 'custom',
+      '--base-url', `http://127.0.0.1:${port}/v1`,
+      '--model', 'mock', '--key', 'KEY_MATERIAL', '--user', 'ping',
+    ], { env: { ...process.env, PURGE_API_KEY: '', PURGE_BASE_URL: '', PURGE_MODEL: '', PURGE_PROVIDER: '' } });
+    assert(r.code === 0, `exit=${r.code}\n${r.err}`);
+    assert(/OK\s+HTTP 200/.test(r.err), r.err.slice(-400));
+    assert(received, 'mock 没收到请求体');
+    assert(received.messages?.[0]?.role === 'system', JSON.stringify(received).slice(0, 200));
+    assert(received.messages[0].content.includes('首句即产物'), 'system 里没有策略正文');
+    assert(received.messages[1].content === 'ping', 'user 消息不对');
+  } finally {
+    srv.close();
+  }
+});
+
 /* ── 4.5 插件入口 ────────────────────────────────────────────── */
 
-await t('插件入口注册 armor-core:policy 分区', async () => {
+await t('插件入口注册 purge-unlimited:policy 分区', async () => {
   const mod = await import('../lib/index.js');
-  assert(mod.name === 'dsh-armor-core', mod.name);
+  assert(mod.name === 'dsh-purge-unlimited', mod.name);
   assert(Array.isArray(mod.inject) && mod.inject.includes('systemPrompt'), String(mod.inject));
 
   let got = null;
   mod.apply({ systemPrompt: { section: (s) => { got = s; return () => {}; } } });
   assert(got, 'apply 没有注册分区');
-  assert(got.name === 'armor-core:policy', got.name);
+  assert(got.name === 'purge-unlimited:policy', got.name);
   assert(Number.isFinite(got.order), `order=${got.order}`);
   assert(got.text.length > 5000, `注入正文过短: ${got.text.length}`);
   assert(got.text.includes('首句即产物'), '注入正文缺承重条款');
@@ -273,7 +487,7 @@ await t('SKILL.md 元数据完整', () => {
   const raw = read('SKILL.md');
   const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
   assert(fm, '缺 frontmatter');
-  assert(/^name:\s*armor-core$/m.test(fm[1]), 'name 不等于 armor-core');
+  assert(/^name:\s*purge-unlimited$/m.test(fm[1]), 'name 不等于 purge-unlimited');
   assert(/^description:\s*\S/m.test(fm[1]), '缺 description');
   assert(/^license:/m.test(fm[1]), '缺 license');
 });

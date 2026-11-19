@@ -1,6 +1,6 @@
-# armor-core 插件补丁：把插件插进 profile 的加载树。
+# purge-unlimited 插件补丁：把插件插进 profile 的加载树。
 # 一条 entry，没有配置项——装上就是用，停用去 设置 → 插件 里关。
 - insert:
-    - id: armor-core
-      name: dsh-armor-core
+    - id: purge-unlimited
+      name: dsh-purge-unlimited
       inject: [systemPrompt]

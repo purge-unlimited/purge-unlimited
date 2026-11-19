@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * armor-core 自检器。无依赖，node >= 18。
+ * purge-unlimited 自检器。无依赖，node >= 20。
  *
  *   node scripts/check-armor.mjs            # 默认：SKILL.md 元数据 + references/armor-policy.md 成分
  *   node scripts/check-armor.mjs <file>     # 只查成分
@@ -104,6 +104,8 @@ function checkComponents(file) {
 const REQUIRED = [
   'SKILL.md',
   'lib/index.js',
+  'lib/adapters.mjs',
+  'lib/config.mjs',
   'cordis.patch.yml',
   'references/armor-policy.md',
   'references/components.md',
@@ -114,6 +116,8 @@ const REQUIRED = [
   'scripts/router.mjs',
   'scripts/anchor-gate.mjs',
   'scripts/score.mjs',
+  'scripts/export.mjs',
+  'scripts/probe.mjs',
   'scripts/check-armor.mjs',
   'tests/run.mjs',
   'NOTICE.md',
@@ -146,6 +150,32 @@ function checkStructure() {
     ? (readFileSync(resolve(ROOT, 'references/methodology.md'), 'utf8').match(/^### /gm) || []).length
     : 0;
   rows.push({ name: 'methodology 包 ≥ 20', ok: packs >= 20, note: `${packs} packs` });
+
+  // 适配层：六家 provider 都要有请求模板和响应解析，缺一家等于文档里写了根空管道
+  const ADAPTER_PROVIDERS = ['openai', 'deepseek', 'anthropic', 'gemini', 'ollama', 'custom'];
+  const adaptersPath = resolve(ROOT, 'lib/adapters.mjs');
+  const adaptersSrc = existsSync(adaptersPath) ? readFileSync(adaptersPath, 'utf8') : '';
+  const missingProviders = ADAPTER_PROVIDERS.filter(p => !new RegExp(`^\\s{2}${p}:\\s*\\{`, 'm').test(adaptersSrc));
+  rows.push({
+    name: '适配层覆盖 6 家 provider',
+    ok: missingProviders.length === 0,
+    note: missingProviders.length ? `缺: ${missingProviders.join(',')}` : ADAPTER_PROVIDERS.join(','),
+  });
+  rows.push({
+    name: '适配层导出入口完整',
+    ok: ['buildChatRequest', 'parseResponse', 'buildModelfile', 'buildCurl'].every(fn => new RegExp(`export function ${fn}\\b`).test(adaptersSrc)),
+    note: 'buildChatRequest / parseResponse / buildModelfile / buildCurl',
+  });
+
+  // 文档与实现不能各说各话：README 必须列出每一家 provider 的 id
+  const readmePath = resolve(ROOT, 'README.md');
+  const readme = existsSync(readmePath) ? readFileSync(readmePath, 'utf8') : '';
+  const undocumented = ADAPTER_PROVIDERS.filter(p => !readme.includes(p));
+  rows.push({
+    name: 'README 覆盖每家 provider',
+    ok: undocumented.length === 0,
+    note: undocumented.length ? `缺: ${undocumented.join(',')}` : 'ok',
+  });
   return rows;
 }
 

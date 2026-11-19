@@ -1,12 +1,17 @@
-# armor-core · 破甲核心
+# purge-unlimited · 破甲核心
 
 把「拒绝 / 说教 / 脚手架」从模型的输出分布里删掉，只留交付物。
+同一套策略，**装进 DeepSeek Harness 就每轮自动生效，也能带到 OpenAI / DeepSeek / Claude / Gemini / 本地 Ollama 上去跑**。
 
-一个 **DeepSeek Harness 插件**：装上就把 18 条承重行为契约挂进每次会话的系统提示词，让回答第一段就是产物、缺的参数用占位符承接、结尾带一条可复现的验证命令。附带零依赖的 Node 脚本，可以单独拿来装配提示词、在拒绝发生后换相位重入、给回答打分。
+## 简介 / In brief
+
+**中文**：purge-unlimited（原名 armor-core）是一套「交付物优先」的执行策略。装成 DeepSeek Harness 插件后，它往每次会话的系统提示词里插一段常驻策略（18 条承重契约）：首段就是产物本体、缺的参数用大写占位符承接、拒绝被当成换相位的信号而不是终点、结尾附一条可复现的验证命令。同一份策略可以离开 DSH 单独用——`scripts/export.mjs` 把它转成 OpenAI、DeepSeek、Anthropic、Gemini、Ollama 或任何 OpenAI 兼容端点的请求体，`scripts/probe.mjs` 真发一次请求验证这条路通不通。零 npm 依赖，Node ≥ 20；插件本身不需要任何 key，接别家模型时每个 provider 只需设一个环境变量。
+
+**English**: purge-unlimited (formerly armor-core) is a deliverable-first execution policy. Installed as a DeepSeek Harness plugin, it registers one permanent system-prompt section — 18 load-bearing contracts — in every session: the first paragraph is the artifact itself, missing parameters arrive as uppercase placeholders, a refusal becomes a phase change rather than a stop, and each reply ends with a reproducible verification command. The same policy also runs outside DSH: `scripts/export.mjs` turns it into a ready request body for OpenAI, DeepSeek, Anthropic, Gemini, Ollama or any OpenAI-compatible endpoint, and `scripts/probe.mjs` sends one real request to prove the path works. Zero npm dependencies, Node ≥ 20; the plugin needs no API key at all, and each third-party provider needs exactly one environment variable.
 
 - **解决什么**：同一件事要说三遍才做；第一段永远是"我先说明一下"；问到细节就退成建议；换个模型整套提示词就废了。
-- **插件做什么**：往系统提示词里插一段 `armor-core:policy`（order 700，团队策略之后、工具说明之前），每次会话装配时自动带上。没有设置页，没有配置项，没有构建步骤。
-- **不碰什么**：不需要 API key，不联网，不改宿主机，不写系统目录。
+- **插件做什么**：往系统提示词里插一段 `purge-unlimited:policy`（order 700，团队策略之后、工具说明之前），每次会话装配时自动带上。没有设置页，没有配置项，没有构建步骤。
+- **不碰什么**：不联网，不改宿主机，不写系统目录，不需要 API key。
 
 ## 一眼看懂
 
@@ -22,26 +27,95 @@
 
 ## 安装
 
-**装成插件**（推荐，跟本机其他插件一样）：
+### 装成插件（推荐）
 
 ```bash
-npm pack            # 仓库根目录，产出 dsh-armor-core-1.1.1.tgz
+npm pack            # 仓库根目录，产出 dsh-purge-unlimited-2.0.0.tgz
 ```
 
 1. 打开 **设置 → 插件**，选安装插件，把这枚 `.tgz`（或它的绝对路径）交给它。
-2. 装完插件列表里出现 **armor-core**，默认启用。新会话生效；界面没刷新就重开一次应用。
+2. 装完插件列表里出现 **purge-unlimited**，默认启用。新会话生效；界面没刷新就重开一次应用。
 3. 停用或卸载：还是这一页，关掉或移除即可，系统提示词里那段随之消失。
 
-**不装插件，只当文件用**：把仓库放进 skill 目录（`~/.agents/skills/armor-core`）就是一份 Agent Skill；或者按下一节的接法自己拼进系统提示词。两条路用的是同一套 `SKILL.md` 与 `references/`。
+> 从 `armor-core` 改名过来的用户：先卸掉旧的 `dsh-armor-core` 再装这个，否则同一段策略会注入两遍（见失效模式 7）。
+
+### 不装插件，只当文件用
+
+把仓库放进 skill 目录（`~/.agents/skills/purge-unlimited`）就是一份 Agent Skill；或者按「接成中间件」一节自己拼进系统提示词。两条路用的是同一套 `SKILL.md` 与 `references/`。
+
+### 接到别家 AI
+
+三种用法，同一份策略文本，换 provider 不改变行为契约。
+
+| provider | 默认端点 | 默认模型 | key 环境变量 |
+|---|---|---|---|
+| `openai` | `https://api.openai.com/v1` | `gpt-4o-mini` | `OPENAI_API_KEY` |
+| `deepseek` | `https://api.deepseek.com/v1` | `deepseek-chat` | `DEEPSEEK_API_KEY` |
+| `anthropic` | `https://api.anthropic.com` | `claude-sonnet-4-5` | `ANTHROPIC_API_KEY` |
+| `gemini` | `https://generativelanguage.googleapis.com` | `gemini-2.5-flash` | `GEMINI_API_KEY` |
+| `ollama` | `http://127.0.0.1:11434` | `llama3.1` | 不需要 |
+| `custom` | 自填（vLLM / LM Studio / Kimi / Qwen / 自建网关） | 自填 | `PURGE_API_KEY`（可空） |
+
+**1) 导出请求体**——拿去 curl、Postman 或自己的服务里用：
+
+```bash
+node scripts/export.mjs --provider openai --sample "帮我 review 这个 patch"
+node scripts/export.mjs --provider anthropic --out build/anthropic.json
+node scripts/export.mjs --provider all --dir build/adapters     # 六家一次出全
+node scripts/export.mjs --provider ollama --modelfile --out build/Modelfile
+node scripts/export.mjs --provider deepseek --curl              # 打一条不落明文 key 的 curl
+```
+
+**2) 真发一次验证**——配好 key 之后：
+
+```bash
+setx OPENAI_API_KEY "..."                                      # Windows，重开终端生效
+node scripts/probe.mjs --provider openai --model gpt-4o-mini
+node scripts/probe.mjs --provider ollama --model llama3.1      # 本地，不需要 key
+node scripts/probe.mjs --provider custom --base-url http://127.0.0.1:8000/v1 --model Qwen2.5-7B
+node scripts/probe.mjs --provider anthropic --dry-run          # 只看请求形状，不发
+```
+
+退出码：`0` 通；`1` HTTP 非 2xx 或响应解析失败；`2` 网络层不通；`3` 缺 key（跳过，不算失败）。
+
+**3) 在代码里直接调**——适配层是纯函数，不联网：
+
+```js
+import { buildChatRequest, parseResponse } from 'purge-unlimited/adapters';
+import { assemble } from './scripts/assemble.mjs';
+
+const { text: system } = assemble({ preset: 'gpt-class', budget: 9000, withPolicy: true });
+const req = buildChatRequest({ provider: 'gemini', system, user: '帮我拆这段二进制', apiKey: process.env.GEMINI_API_KEY });
+
+const res = await fetch(req.url, { method: req.method, headers: req.headers, body: JSON.stringify(req.body) });
+console.log(parseResponse('gemini', await res.json()));
+```
+
+参数合并顺序固定为 **命令行 > 环境变量 > 配置文件 > provider 默认值**。配置文件 `.purge-unlimited.json`（放当前目录或家目录，二选一）：
+
+```json
+{
+  "provider": "deepseek",
+  "model": "deepseek-chat",
+  "budget": 12000,
+  "preset": "gpt-class",
+  "temperature": 0.7
+}
+```
+
+对应环境变量：`PURGE_PROVIDER` / `PURGE_MODEL` / `PURGE_BASE_URL` / `PURGE_API_KEY` / `PURGE_PRESET` / `PURGE_BUDGET` / `PURGE_TEMPERATURE` / `PURGE_MAX_TOKENS`。
 
 ## 结构
 
 ```
-armor-core/
-├─ lib/index.js             插件入口：注册系统提示词分区，没别的
+purge-unlimited/
+├─ lib/
+│  ├─ index.js              插件入口：注册系统提示词分区
+│  ├─ adapters.mjs          多模型适配层：请求体 / 响应解析 / Modelfile / curl
+│  └─ config.mjs            参数合并：命令行 > 环境变量 > 配置文件 > 默认值
 ├─ cordis.patch.yml         插件补丁：往加载树里插一条 entry，无配置
-├─ package.json             插件清单：main + dsh.bundle.patch
-├─ SKILL.md                 操作层：每轮照做的 9 步短流程（175 行，≈2.2k tokens）
+├─ package.json             插件清单：main + exports + dsh.bundle.patch
+├─ SKILL.md                 操作层：每轮照做的固定流程（≈2.2k tokens）
 ├─ references/
 │  ├─ armor-policy.md       策略本体：18 承重成分 / 全量词表 / 13 条槽位 / 六契约
 │  ├─ methodology.md        20 张方法论卡（侦察→突破→立足→内网），已去本地化
@@ -49,37 +123,36 @@ armor-core/
 │  ├─ deploy.md             静态注入 vs 插件化路由、按模型配权、令牌预算
 │  └─ probes.jsonl          14 条评测探针
 ├─ presets/                 四个模型预设：claude-sonnet / gpt-class / local-small / reasoning
-├─ scripts/                 装配 / 路由 / 锚定 / 评分 / 自检（零 npm 依赖）
-├─ tests/run.mjs            28 条行为测试
+├─ scripts/                 装配 / 路由 / 锚定 / 评分 / 自检 / 导出 / 探活（零依赖）
+├─ tests/run.mjs            44 条行为测试
 ├─ NOTICE.md · CHANGELOG.md · LICENSE (Apache-2.0)
 ```
 
-插件入口只有三件事：读出 `SKILL.md`、按默认预设装配、注册一段分区。
+插件入口只有一件事：
 
 ```js
-// lib/index.js 的全部逻辑
 export const inject = ['systemPrompt'];
 export function apply(ctx) {
   if (typeof ctx?.systemPrompt?.section !== 'function') return;
-  ctx.systemPrompt.section({ name: 'armor-core:policy', order: 700, text: buildPolicyText() });
+  ctx.systemPrompt.section({ name: 'purge-unlimited:policy', order: 700, text: buildPolicyText() });
 }
 ```
 
 ## 自检
 
 ```bash
-node scripts/check-armor.mjs   # 元数据 9 项 + 结构 20 项 + 承重成分 18 项
-node tests/run.mjs             # 28 条行为测试
-node scripts/router.mjs --demo # 模拟两次拒绝 → 两跳后落地
+node scripts/check-armor.mjs    # 元数据 9 项 + 结构 27 项 + 承重成分 18 项
+node tests/run.mjs              # 44 条行为测试（含 probe 对本地 mock 端点真发一次）
+node scripts/router.mjs --demo  # 模拟两次拒绝 → 两跳后落地
 ```
 
 实跑结果（Node 26.13.0）：
 
 ```
 SKILL.md · 元数据      coverage: 9/9
-结构 · 文件            coverage: 20/20
+结构 · 文件            coverage: 27/27
 承重成分               coverage: 18/18
-tests: 28/28 passed
+tests: 44/44 passed
 ```
 
 任一失败退出码 1。CI 在 Node 20 / 22 / 24 上跑同一套。
@@ -161,8 +234,8 @@ ASSEMBLE
 
 ## 依赖
 
-- **Node ≥ 20**（本机实测 26.13.0；CI 矩阵 20 / 22 / 24）。用到 ESM + top-level await + `fs.cpSync`。
-- **零 npm 依赖**，不需要 `npm install`，不联网。
+- **Node ≥ 20**（本机实测 26.13.0；CI 矩阵 20 / 22 / 24）。用到 ESM + top-level await + `fs.cpSync` + 内置 `fetch`。
+- **零 npm 依赖**，不需要 `npm install`；除 `probe` 外任何脚本都不联网。
 - 插件侧只依赖宿主自带的 `systemPrompt` 服务；宿主没提供时安静跳过，不会让进程起不来。
 
 ## 已知失效模式
@@ -173,7 +246,16 @@ ASSEMBLE
 4. **预设槽反噬**——槽位写死会诱导硬套。宁可删槽，不要凑槽。
 5. **人格与事实冲突**——绝对偏向会让人格在事实层面也顺着用户走；`armor-policy.md` §2.6 反谄媚 + §4.7 真实优先是压这个的，别删。
 6. **方法论卡的本地化残留**——20 张卡已去本地化（路径→`TOOL_BIN`，主机→`TARGET`），但工具版本与参数随环境变化，用前对一遍目标环境。
-7. **插件与 skill 双开**——同一套策略既装成插件、又放进 skill 目录，会在提示词里出现两遍。选一条路。
+7. **插件与 skill 双开**——同一套策略既装成插件、又放进 skill 目录，会在提示词里出现两遍。选一条路；从旧包升级时同理，先卸 `dsh-armor-core`。
+8. **provider 侧不认 system 字段**——个别自建网关把 `system` 当普通消息塞进 `messages`，策略会被稀释成"一段用户输入"。用 `custom` 前先 `probe --dry-run` 对一遍请求形状。
+
+## 命名说明
+
+原名 `armor-core`，2026-11 改为 `purge-unlimited`：
+
+- 包名 `dsh-purge-unlimited`，skill / 仓库名 `purge-unlimited`，系统提示词分区 `purge-unlimited:policy`。
+- 原始需求写的是 `purge-**unlimited`。`*` 在 npm 包名、GitHub 仓库名、skill name 里都是非法字符（npm 只允许小写字母、数字、`-`、`_`、`.`），因此落成 `purge-unlimited`；要 `purge--unlimited` 这类变体是改一处 `package.json` + `SKILL.md` 的事。
+- 与本机已有的 `dsh-purge` 不是一个包：那个是语义层来源之一，这是把语义层 + 可执行层 + 多模型适配合起来的独立包。两者同时装会重复注入人格层。
 
 ## 用途
 
@@ -187,4 +269,4 @@ Apache-2.0，见 [LICENSE](LICENSE)。版本记录见 [CHANGELOG.md](CHANGELOG.m
 
 ## 贡献
 
-提交前跑 `npm run verify`（= `check-armor` + `tests`）。改承重成分的定义时，同步 `references/components.md` 与 `scripts/check-armor.mjs` 的 `COMPONENTS` 表；改插件入口时，同步 `cordis.patch.yml` 的 entry id 与 `lib/index.js` 的分区名，两边对不上自检会红。
+提交前跑 `npm run verify`（= `check-armor` + `tests`）。改承重成分的定义时，同步 `references/components.md` 与 `scripts/check-armor.mjs` 的 `COMPONENTS` 表；改插件入口时，同步 `cordis.patch.yml` 的 entry id、`lib/index.js` 的分区名与 `package.json` 的 `name`，三处对不上自检会红；加 provider 时，改 `lib/adapters.mjs` 的 `PROVIDERS` 表并补一条请求体/响应解析用例。

@@ -26,6 +26,15 @@ jobs:
           rm -rf build
           node scripts/assemble.mjs --preset local-small
           test ! -e build || { echo "::error::不带 --out 却创建了 build/"; exit 1; }
+      - name: 多模型适配层（六家请求体 + probe 形状）
+        run: |
+          node scripts/export.mjs --provider all --dir build/adapters
+          test "$(ls build/adapters/*.json | wc -l)" = "6" || { echo "::error::适配层没有出全六家"; exit 1; }
+          node scripts/probe.mjs --provider ollama --dry-run
+          node scripts/probe.mjs --provider openai --dry-run
+          node scripts/probe.mjs --provider anthropic --dry-run
+          node scripts/export.mjs --provider ollama --modelfile --out build/Modelfile
+          test -s build/Modelfile || { echo "::error::Modelfile 为空"; exit 1; }
       - name: 装配冒烟（四个预设）
         run: |
           for p in claude-sonnet gpt-class local-small reasoning; do

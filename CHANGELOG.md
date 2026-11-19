@@ -2,6 +2,43 @@
 
 版本号单点：`package.json` 的 `version` 是唯一来源，`SKILL.md` 的 `metadata.version` 必须与之一致——`node scripts/check-armor.mjs` 会查这一条。
 
+## v2.0.0 — 2026-11-19
+
+改名 + 接别家模型。策略本体一字未动，动的是外壳、接法与文档。
+
+**改名（破坏性）**
+
+- 包名 `dsh-armor-core` → `dsh-purge-unlimited`，skill / 仓库名 `armor-core` → `purge-unlimited`，系统提示词分区 `armor-core:policy` → `purge-unlimited:policy`，补丁 entry id `armor-core` → `purge-unlimited`。
+- 需求原文写的是 `purge-**unlimited`；`*` 在 npm 包名、GitHub 仓库名、skill name 里都非法，落成 `purge-unlimited`（理由写在 README「命名说明」）。
+- 升级路径：先卸 `dsh-armor-core` 再装 `dsh-purge-unlimited`，否则同一段策略注入两遍（失效模式 7）。
+
+**新增：多模型适配层**
+
+- `lib/adapters.mjs`：六家 provider（`openai` / `deepseek` / `anthropic` / `gemini` / `ollama` / `custom`）的请求体构造、响应解析、`buildModelfile`、`buildCurl`。纯函数、零依赖、不联网。
+  - `anthropic` 的 system 走顶层数组并带 `cache_control: ephemeral`，长策略在重复会话里命中缓存。
+  - `gemini` 用 `systemInstruction`，模型名进 URL，key 走 `x-goog-api-key` 头（不落 URL 日志）。
+  - `ollama` 用 `/api/generate`，`system` 独立字段，不需要 key。
+- `lib/config.mjs`：参数合并固定为 **命令行 > 环境变量 > 配置文件 > provider 默认值**；配置文件 `.purge-unlimited.json`（项目级或家目录）。
+- `scripts/export.mjs`：把装配结果导出成六家的请求体 / Modelfile / curl；`--provider all --dir` 一次出全；不给 `--out` / `--dir` 不落盘。
+- `scripts/probe.mjs`：真发一次请求做连通性自检。退出码 `0` 通 / `1` HTTP 或解析失败 / `2` 网络不通 / `3` 缺 key（跳过，不算失败）。`--dry-run` 只看形状、不需要 key。
+- `lib/index.js` re-export 适配层，装成插件后也能 `import { buildChatRequest } from 'dsh-purge-unlimited'`。
+
+**自检**
+
+- `check-armor` 结构项 20 → 27：`lib/adapters.mjs`、`lib/config.mjs`、`scripts/export.mjs`、`scripts/probe.mjs` 进 REQUIRED；新增「适配层覆盖 6 家 provider」「适配层导出入口完整」「README 覆盖每家 provider」三条结构校验——文档写了家数、代码里没有对应模板时会红。
+- `tests` 28 → 44：新增 16 条，覆盖六家请求体形状、缺 key 报错、六种响应解析、Modelfile、curl 不落明文 key、配置优先级、export CLI 落盘/不落盘、probe dry-run、probe 缺 key 退出 3、以及**在一个本地 mock OpenAI 端点上真发一次**（断言服务端收到的 `messages[0].content` 里就是策略正文）。
+
+**文档**
+
+- README 顶部加中英双语简介（各一段，覆盖：是什么 / 能干什么 / 怎么装 / 怎么用 / 依赖 / 接别家 AI 配什么）。
+- 新增「接到别家 AI」一节：provider 表（默认端点 / 默认模型 / key 环境变量）、三种用法（导出 / 真发 / 代码里调）、配置优先级与配置文件示例。
+- 新增「命名说明」与失效模式 8（个别自建网关不认 `system` 字段）。
+- `SKILL.md` §8 脚本表 5 → 7，补 export / probe 与适配层入口说明；§9 自检数字同步。
+
+**版本**
+
+- `package.json` 与 `SKILL.md` 的 `metadata.version` 同为 2.0.0。
+
 ## v1.2.0 — 2026-11-19
 
 形态改变：从「clone 下来自己跑的仓库」变成「装上就生效的 dsh 插件」。文字层、脚本层、测试不动，外面套一层跟本机其他插件一致的壳。

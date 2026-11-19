@@ -1,12 +1,14 @@
 {
-  "name": "dsh-armor-core",
-  "version": "1.2.0",
+  "name": "dsh-purge-unlimited",
+  "version": "2.0.0",
   "type": "module",
-  "description": "Deliverable-first execution policy for DeepSeek Harness. 18-component behavior contract layered onto every session's system prompt, with standalone assembly, recovery routing, anchor gating and probe scoring.",
+  "description": "Deliverable-first execution policy for DeepSeek Harness, plus a provider-neutral adapter layer (OpenAI / DeepSeek / Anthropic / Gemini / Ollama / any OpenAI-compatible endpoint). 18-component behavior contract injected into every session's system prompt, with standalone assembly, recovery routing, anchor gating and probe scoring.",
   "license": "Apache-2.0",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
+    "./adapters": "./lib/adapters.mjs",
+    "./config": "./lib/config.mjs",
     "./package.json": "./package.json"
   },
   "files": [
@@ -31,6 +33,8 @@
     "demo:score": "node scripts/score.mjs --selftest",
     "assemble": "node scripts/assemble.mjs --preset claude-sonnet --with-policy --out build/prompt.md",
     "assemble:stdout": "node scripts/assemble.mjs --preset claude-sonnet --with-policy --stdout",
+    "export:all": "node scripts/export.mjs --provider all --dir build/adapters",
+    "probe": "node scripts/probe.mjs --dry-run",
     "pack": "npm pack"
   },
   "keywords": [
@@ -39,7 +43,13 @@
     "deepseek-harness",
     "agent-skill",
     "prompt-engineering",
-    "prompt-eval"
+    "prompt-eval",
+    "system-prompt",
+    "openai",
+    "anthropic",
+    "gemini",
+    "ollama",
+    "llm-adapter"
   ],
   "engines": {
     "node": ">=20"
