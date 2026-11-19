@@ -38,18 +38,28 @@
     "pack": "npm pack"
   },
   "keywords": [
+    "ai",
+    "llm",
+    "llm-agents",
+    "prompt-engineering",
+    "system-prompt",
+    "prompt-library",
+    "prompt-eval",
+    "prompt-injection",
+    "jailbreak-research",
+    "red-teaming",
+    "ai-safety",
+    "deepseek",
+    "deepseek-harness",
     "dsh",
     "dsh-plugin",
-    "deepseek-harness",
     "agent-skill",
-    "prompt-engineering",
-    "prompt-eval",
-    "system-prompt",
+    "plugin",
+    "llm-adapter",
     "openai",
     "anthropic",
     "gemini",
-    "ollama",
-    "llm-adapter"
+    "ollama"
   ],
   "engines": {
     "node": ">=20"

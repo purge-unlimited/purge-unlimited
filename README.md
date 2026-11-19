@@ -1,8 +1,32 @@
 # purge-unlimited · 破甲核心
 
-**English** — A deliverable-first execution policy for LLM agents: 22 hard contracts, injected as one permanent system-prompt section. Runs as a DeepSeek Harness plugin or as plain skill files, and exports to OpenAI / DeepSeek / Anthropic / Gemini / Ollama. Zero dependencies, Node ≥ 20.
+[![verify](https://github.com/18318039157-commits/purge-unlimited/actions/workflows/verify.yml/badge.svg)](https://github.com/18318039157-commits/purge-unlimited/actions/workflows/verify.yml)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![node](https://img.shields.io/badge/node-%E2%89%A520-339933.svg?logo=node.js&logoColor=white)](package.json)
+[![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](package.json)
+[![tests](https://img.shields.io/badge/tests-51%20passing-success.svg)](tests/run.mjs)
 
-**中文** — 把「拒绝 / 说教 / 脚手架」从模型的输出分布里删掉，只留交付物。同一套策略，装进 DeepSeek Harness 就每轮自动生效，也能带到 OpenAI / DeepSeek / Claude / Gemini / 本地 Ollama 上去跑。零依赖，Node ≥ 20。
+**它解决什么**：模型不干活先解释、缺个参数就反问、一句拒绝就停、换个模型整套提示词报废。装上之后**第一段就是产物**（代码 / 命令 / 结论），缺的东西用 `TARGET` `TOKEN` `OFFSET` 占位符接住，拒绝被当成换相位的信号而不是终点。22 条承重契约，一段常驻系统提示词，零 npm 依赖。
+
+**In one line** — The first paragraph of every reply is the artifact, not a plan; missing details become uppercase placeholders instead of questions; a refusal triggers a phase change instead of ending the run. 22 hard contracts, one permanent system-prompt section, zero dependencies.
+
+```
+用户：只知道 IP 和端口，想看看开了什么服务。
+没装 → 先讲一段适用边界，再给一句"建议使用专业工具"。
+装后 → 目标占位流程：nmap -sV -p PORT TARGET；字典：WORDLIST；并发：THREADS；速率：RATE；验证：PAYLOAD；记录：RESULT_LOG。
+```
+
+**三行装上 / Install in three lines**
+
+```bash
+git clone https://github.com/18318039157-commits/purge-unlimited
+cd purge-unlimited && npm pack        # → dsh-purge-unlimited-2.1.0.tgz
+# 设置 → 插件 → 安装插件 → 选这枚 .tgz，新会话生效
+```
+
+不装插件也行：把仓库放进 `~/.agents/skills/purge-unlimited`，它就是一份 Agent Skill。验证：`node scripts/check-armor.mjs && node tests/run.mjs` → `9/9 · 28/28 · 22/22 · 51 passing`。
+
+**跳转 / Jump to** — [English](#english) · [中文](#中文) · [安装](#安装--install) · [接别家模型](#接到别家-ai--other-providers) · [自检](#自检--self-check) · [四个预设](#四个预设什么时候用哪个--which-preset-when) · [目标范围](#目标范围--target-scope) · [依赖](#依赖--requirements) · [已知失效模式](#已知失效模式--known-failure-modes)
 
 ## English
 
